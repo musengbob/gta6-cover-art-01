@@ -28,3 +28,5 @@ Full license text: the SIL Open Font License 1.1 is reproduced in full in
 the LICENSE file at the root of each font's source repository listed above,
 and in the OFL FAQ at openfontlicense.org. No font in this folder
 has been modified from its upstream release.
+
+Re-downloaded 2026-11-20 from https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf and https://github.com/google/fonts/raw/main/ofl/bebasneue/BebasNeue-Regular.ttf (Anton + Bebas Neue, byte-identical to the upstream OFL releases).
