@@ -3,20 +3,127 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cover Snap</title>
+<title>Sunset Panels — GTA 6-style cover maker</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <main class="app">
-  <section class="controls">
-    <h1>Cover Snap</h1>
-    <p>A photo and a caption, made into a square cover.</p>
-    <label>Photo <input id="photo" type="file" accept="image/*"></label>
-    <label>Caption <input id="caption" type="text" maxlength="40" value="Sunset Heist"></label>
-    <button id="export" type="button">Export PNG 1080 x 1080</button>
-    <p id="status" role="status"></p>
+  <section class="controls" aria-label="Cover controls">
+    <h1>Sunset Panels</h1>
+    <p class="tag">Turn your photos into a Vice City sunset cover. 3 steps: load photos, pick a layout, export PNG.</p>
+
+    <div class="group">
+      <h2>1 · Photos (up to 4)</h2>
+      <label>Photo 1 <input type="file" accept="image/*" data-slot="0"></label>
+      <label>Photo 2 <input type="file" accept="image/*" data-slot="1"></label>
+      <label>Photo 3 <input type="file" accept="image/*" data-slot="2"></label>
+      <label>Photo 4 <input type="file" accept="image/*" data-slot="3"></label>
+      <div class="row">
+        <button id="loadSample" type="button">Load sample</button>
+        <button id="clearPhotos" type="button">Clear</button>
+      </div>
+      <p class="hint">Or drag a photo file straight onto a panel in the preview.</p>
+    </div>
+
+    <div class="group">
+      <h2>2 · Layout &amp; grade</h2>
+      <label>Layout
+        <select id="layout">
+          <option value="hero">Hero + Strip</option>
+          <option value="grid">2×2 Grid</option>
+          <option value="strip3">3-Column Strip</option>
+          <option value="diagonal">Diagonal Split</option>
+          <option value="poster">Full-Bleed Poster</option>
+          <option value="comic5">Comic 5-Panel</option>
+        </select>
+      </label>
+      <label>Colour grade
+        <select id="grade">
+          <option value="sunset">Vice Sunset</option>
+          <option value="neon">Neon Pink</option>
+          <option value="golden">Golden Hour</option>
+          <option value="teal">Teal Nights</option>
+          <option value="noir">Mono Noir</option>
+        </select>
+      </label>
+      <label>Preview size
+        <select id="previewSize">
+          <option value="wide">1920 × 1080 landscape</option>
+          <option value="square">1080 × 1080 square</option>
+          <option value="portrait">1080 × 1350 portrait</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="group">
+      <h2>3 · Caption</h2>
+      <label>Title <input id="title" type="text" maxlength="30" value="SUNSET PANELS"></label>
+      <label>Subtitle <input id="subtitle" type="text" maxlength="40" value="VICE CITY • 2026"></label>
+      <label>Lettering
+        <select id="lettering">
+          <option value="outline">Outline</option>
+          <option value="neon">Neon Glow</option>
+          <option value="ribbon">Banner Ribbon</option>
+        </select>
+      </label>
+      <label>Caption position
+        <select id="captionPos">
+          <option value="bottom">Bottom</option>
+          <option value="top">Top</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="group">
+      <h2>4 · Panel</h2>
+      <label>Panel
+        <select id="panelSelect">
+          <option value="0">Panel 1</option>
+          <option value="1">Panel 2</option>
+          <option value="2">Panel 3</option>
+          <option value="3">Panel 4</option>
+          <option value="4">Panel 5</option>
+        </select>
+      </label>
+      <label>Photo in panel
+        <select id="panelPhoto">
+          <option value="0">Photo 1</option>
+          <option value="1">Photo 2</option>
+          <option value="2">Photo 3</option>
+          <option value="3">Photo 4</option>
+        </select>
+      </label>
+      <label>Zoom <input id="panelZoom" type="range" min="1" max="2.5" step="0.05" value="1"></label>
+      <label>Pan X <input id="panelPanX" type="range" min="-1" max="1" step="0.05" value="0"></label>
+      <label>Pan Y <input id="panelPanY" type="range" min="-1" max="1" step="0.05" value="0"></label>
+      <button id="panelFlip" type="button">Flip panel</button>
+    </div>
+
+    <div class="group">
+      <h2>5 · Effects</h2>
+      <label class="check"><input id="fx-halftone" type="checkbox" checked> Halftone dots</label>
+      <label class="check"><input id="fx-grain" type="checkbox" checked> Film grain</label>
+      <label class="check"><input id="fx-vignette" type="checkbox" checked> Vignette</label>
+      <label class="check"><input id="fx-flare" type="checkbox" checked> Sun flare</label>
+    </div>
+
+    <div class="group">
+      <button id="surprise" type="button" class="accent">🎲 Surprise me</button>
+      <h2>Export PNG</h2>
+      <div class="row">
+        <button id="exportSquare" type="button">1080×1080</button>
+        <button id="exportPortrait" type="button">1080×1350</button>
+        <button id="exportWide" type="button">1920×1080</button>
+      </div>
+      <button id="exportAll" type="button" class="accent">Export all 3 sizes</button>
+      <p id="status" role="status"></p>
+    </div>
   </section>
-  <canvas id="cover" width="1080" height="1080" aria-label="The cover"></canvas>
+  <section class="preview" aria-label="Live preview">
+    <canvas id="cover" width="1280" height="720"></canvas>
+    <p class="hint">Live preview — every control updates it instantly. Photos never leave your browser.</p>
+  </section>
 </main>
 <script type="module" src="./src/main.js"></script>
 </body>

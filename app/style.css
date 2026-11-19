@@ -1,12 +1,32 @@
-html, body { margin: 0; height: 100%; background: #f2f0f4; color: #1d1b22; font: 15px/1.4 system-ui, sans-serif; }
-.app { display: flex; gap: 32px; align-items: center; justify-content: center; height: 100%; padding: 24px; box-sizing: border-box; }
-.controls { display: flex; flex-direction: column; gap: 14px; width: 280px; }
-.controls h1 { margin: 0; font-size: 28px; }
-.controls p { margin: 0; color: #5c5866; }
-label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
-input[type=text] { font: inherit; padding: 8px; border: 1px solid #c9c4d1; border-radius: 6px; }
-button { font: inherit; font-weight: 700; padding: 10px; border: 0; border-radius: 6px; background: #1d1b22; color: #fff; cursor: pointer; }
-canvas { width: min(70vh, 60vw); height: min(70vh, 60vw); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2); }
-body.shot-cover .controls { display: none; }
-body.shot-cover .app { padding: 0; }
-body.shot-cover canvas { width: 100vw; height: 100vh; box-shadow: none; }
+@font-face { font-family: 'Anton'; src: url('./fonts/Anton-Regular.ttf') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Bebas Neue'; src: url('./fonts/BebasNeue-Regular.ttf') format('truetype'); font-display: swap; }
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: #12081f; color: #f5eefc; font: 14px/1.45 system-ui, sans-serif; }
+.app { display: flex; gap: 20px; padding: 18px; align-items: flex-start; }
+.controls { width: 320px; flex: none; display: flex; flex-direction: column; gap: 14px; }
+.controls h1 { margin: 0; font-family: 'Anton', sans-serif; font-size: 34px; letter-spacing: 1px; color: #ff5ea8; text-transform: uppercase; }
+.tag { margin: 0; color: #c9b8dd; }
+.group { background: #1e0f31; border: 1px solid #3a2358; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 9px; }
+.group h2 { margin: 0; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #ffd166; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #e8dcf5; }
+label.check { flex-direction: row; align-items: center; gap: 8px; }
+input[type="text"], select { background: #2a1844; color: #fff; border: 1px solid #4a2f6e; border-radius: 6px; padding: 7px 9px; font: inherit; width: 100%; }
+input[type="file"] { font: inherit; color: #c9b8dd; }
+input[type="range"] { width: 100%; accent-color: #ff2e88; }
+button { background: #2a1844; color: #fff; border: 1px solid #ff2e88; border-radius: 6px; padding: 8px 10px; font: inherit; cursor: pointer; }
+button:hover { background: #3a2058; }
+button.accent { background: #ff2e88; border-color: #ff2e88; font-weight: 700; }
+button.accent:hover { background: #ff4d9d; }
+.row { display: flex; gap: 8px; }
+.row button { flex: 1; }
+.hint { margin: 0; font-size: 12px; color: #9d86b8; }
+#status { margin: 0; font-size: 12px; color: #7fe7d4; min-height: 16px; }
+.preview { flex: 1; min-width: 0; }
+.preview canvas { width: 100%; height: auto; display: block; background: #160a24; border: 1px solid #3a2358; border-radius: 8px; }
+.preview .hint { margin-top: 8px; }
+/* Screenshot scenes: hide the editor, show only the cover canvas full-bleed. */
+body.shot-cover .controls, body.shot-cover .preview .hint { display: none; }
+body.shot-cover { background: #000; }
+body.shot-cover .app { padding: 0; display: block; }
+body.shot-cover .preview canvas { width: 100vw; height: 100vh; object-fit: contain; border: 0; border-radius: 0; }
+@media (max-width: 900px) { .app { flex-direction: column; } .controls { width: 100%; } }
