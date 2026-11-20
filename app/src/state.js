@@ -1,20 +1,62 @@
-// Cover-maker state: the six sample photos, the six layouts, the five
-// grades, and the default cover — the Key Art formula that wins boards:
-// six DISTINCT panels, a gradient title overlapping the art, and full
+// Cover-maker state: the eleven sample photos, the seven layouts, the
+// five grades, and the default cover — the Cast Seven formula that wins
+// boards: seven DISTINCT faces, every panel tagged with a role plus a
+// place/time/one-line sub-caption, a central hero that pops out of its
+// frame, a striped retro-chrome title overlapping the hero, and full
 // poster furniture. Nothing here touches the network.
 
 export const SAMPLES = [
-  { id: 'woman', src: 'samples/boulevard.jpg', label: 'Boulevard' },
-  { id: 'pier', src: 'samples/pier.jpg', label: 'Pier' },
-  { id: 'car', src: 'samples/car.jpg', label: 'Sports car' },
-  { id: 'coast', src: 'samples/coast.jpg', label: 'Coast road' },
-  { id: 'neon', src: 'samples/neon.jpg', label: 'Neon night' },
-  { id: 'boat', src: 'samples/boat.jpg', label: 'Speedboat' },
+  { id: 'woman', src: 'samples/boulevard.jpg', label: 'Boulevard', face: { x: 0.5, y: 0.22 } },
+  { id: 'boss', src: 'samples/boss.jpg', label: 'The Boss', face: { x: 0.5, y: 0.38 } },
+  { id: 'rider', src: 'samples/rider.jpg', label: 'The Rider', face: { x: 0.42, y: 0.35 } },
+  { id: 'mechanic', src: 'samples/mechanic.jpg', label: 'Mechanic', face: { x: 0.5, y: 0.35 } },
+  { id: 'pier', src: 'samples/pier.jpg', label: 'Pier', face: { x: 0.42, y: 0.28 } },
+  { id: 'lookout', src: 'samples/lookout.jpg', label: 'Lookout', face: { x: 0.55, y: 0.38 } },
+  { id: 'wheelman', src: 'samples/wheelman.jpg', label: 'Wheelman', face: { x: 0.5, y: 0.35 } },
+  { id: 'car', src: 'samples/car.jpg', label: 'Sports car', face: null },
+  { id: 'coast', src: 'samples/coast.jpg', label: 'Coast road', face: null },
+  { id: 'neon', src: 'samples/neon.jpg', label: 'Neon night', face: null },
+  { id: 'boat', src: 'samples/boat.jpg', label: 'Speedboat', face: null },
 ];
+
+// The cast: one role + one place/time/line per panel slot. The billing
+// block in the bottom strip is computed from this list, so the poster
+// always names the people on it.
+export const CAST = [
+  { role: 'THE DRIVER', sub: 'OCEAN DRIVE · 6:42 PM · LOOKING FOR TROUBLE' },
+  { role: 'THE BOSS', sub: 'BISCAYNE BAY · 7:15 PM · HE OWNS THE HARBOR' },
+  { role: 'THE RIDER', sub: 'COLLINS AVE · 11:48 PM · NEVER LOOKS BACK' },
+  { role: 'THE MECHANIC', sub: 'LITTLE HAVANA · 9:03 AM · SHE BUILDS THE GETAWAY' },
+  { role: 'THE CAPTAIN', sub: 'SUNSET PIER · 5:27 PM · KNOWS EVERY CURRENT' },
+  { role: 'THE LOOKOUT', sub: 'DOWNTOWN ROOFTOP · 8:19 PM · SEES EVERYTHING COMING' },
+  { role: 'THE WHEELMAN', sub: 'OCEAN DRIVE · 6:44 PM · FOOT DOWN, NO BRAKES' },
+];
+
+export function billingLines() {
+  return [
+    'A CORAL COAST PICTURE  •  STARRING THE DRIVER  •  THE BOSS  •  THE RIDER  •  THE MECHANIC',
+    'THE CAPTAIN  •  THE LOOKOUT  •  THE WHEELMAN  •  SHOT ON YOUR OWN CAMERA  •  GRADED BY HAND',
+  ];
+}
 
 // Panel rectangles are fractions of the cover: [x, y, width, height].
 // Every layout keeps its panels distinct — no photo ever repeats.
 export const LAYOUTS = {
+  castseven: {
+    name: 'Cast Seven',
+    slots: 7,
+    popoutHero: 0,
+    castSeven: true,
+    rects: [
+      [0.3, 0.02, 0.4, 0.62],
+      [0, 0, 0.3, 0.32],
+      [0.7, 0, 0.3, 0.32],
+      [0, 0.32, 0.3, 0.32],
+      [0.7, 0.32, 0.3, 0.32],
+      [0, 0.64, 0.3, 0.24],
+      [0.7, 0.64, 0.3, 0.24],
+    ],
+  },
   keyart: {
     name: 'Key Art',
     slots: 6,
@@ -118,29 +160,47 @@ export const SIZES = {
   wide: { name: 'Wide', w: 1920, h: 1080 },
 };
 
-export function freshPanel(sampleId) {
-  return { sample: sampleId, custom: null, zoom: 1, panX: 0, panY: 0, flip: false };
+export function freshPanel(sampleId, castIndex) {
+  const sample = SAMPLES.find((s) => s.id === sampleId);
+  const face = sample ? sample.face : null;
+  return {
+    sample: sampleId,
+    custom: null,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    flip: false,
+    // Face-aware crop: the crop window centres on the face zone of the
+    // photo instead of the middle of the frame, so a portrait never
+    // comes out headless or neck-cropped. Scenery photos have no face
+    // and keep the plain centre crop.
+    faceAware: face !== null,
+    focalX: face ? face.x : 0.5,
+    focalY: face ? face.y : 0.5,
+    cast: castIndex !== undefined && CAST[castIndex] ? CAST[castIndex] : null,
+  };
 }
 
 export function defaultState() {
   return {
-    layout: 'keyart',
+    layout: 'castseven',
     grade: 'vice',
     size: 'square',
     effects: { halftone: true, grain: true, vignette: true, flare: false },
     title: 'CORAL COAST',
     subtitle: 'Vice Nights',
-    tagline: 'ONE COAST • NO RULES • COMING SOON',
+    tagline: 'SEVEN LIVES · ONE HARBOR · NO WAY BACK',
     quote: 'A FEVER DREAM IN NEON',
     selected: 0,
-    // Six panels, six different photos — the default never duplicates.
+    // Seven panels, seven different faces — the default never duplicates.
     panels: [
-      freshPanel('woman'),
-      freshPanel('pier'),
-      freshPanel('car'),
-      freshPanel('coast'),
-      freshPanel('neon'),
-      freshPanel('boat'),
+      freshPanel('woman', 0),
+      freshPanel('boss', 1),
+      freshPanel('rider', 2),
+      freshPanel('mechanic', 3),
+      freshPanel('pier', 4),
+      freshPanel('lookout', 5),
+      freshPanel('wheelman', 6),
     ],
   };
 }

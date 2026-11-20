@@ -3,17 +3,34 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Coral Coast — GTA-Style Cover Maker</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ff2e88'/%3E%3Ctext x='16' y='23' font-family='Arial Black' font-size='17' font-weight='900' text-anchor='middle' fill='%23ffe259'%3ECC%3C/text%3E%3C/svg%3E">
+<title>Coral Coast — Cast Seven Cover Maker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ff2e88'/%3E%3Ctext x='16' y='24' font-family='Arial Black' font-size='19' font-weight='900' text-anchor='middle' fill='%23ffe259'%3E7%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
+<style>
+  /* Role tag of the selected panel, and the static cast roster. */
+  .cast-tag {
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    font-size: 16px;
+    letter-spacing: 0.06em;
+    color: #ffd21f;
+    background: #160a2e;
+    border-left: 3px solid #ff2e88;
+    border-radius: 6px;
+  }
+  .cast-list { margin: 0; padding-left: 18px; font-size: 15px; color: var(--ink-dim); }
+  .cast-list li { margin-bottom: 3px; }
+  .cast-list b { color: var(--ink); font-weight: normal; letter-spacing: 0.08em; }
+  .face-note { font-size: 14px; color: var(--ink-dim); margin: 0 0 10px; }
+</style>
 </head>
 <body>
 <header class="topbar">
   <div class="brand">
-    <span class="brand-mark">CC</span>
+    <span class="brand-mark">7</span>
     <div>
       <h1>CORAL COAST</h1>
-      <p>GTA-style cover maker — six panels, one sunset, zero duplicates</p>
+      <p>Cast Seven cover maker — seven faces, one harbor, no way back</p>
     </div>
   </div>
   <div class="size-tabs" role="tablist" aria-label="Cover size">
@@ -26,10 +43,10 @@
 <main class="workspace">
   <section class="stage-wrap">
     <div class="stage-frame">
-      <canvas id="stage" width="1080" height="1080" aria-label="Cover preview — click a panel to select it"></canvas>
+      <canvas id="stage" width="1080" height="1080" aria-label="Cover preview — click a panel to select it, drag a panel to move its face focal point"></canvas>
       <div class="drop-hint" id="dropHint">Drop a photo to replace the panel under it</div>
     </div>
-    <p class="stage-note">Click any panel to select it, then pick a sample, upload a photo, or tune zoom and pan. The preview is the exact export — what you see is the PNG.</p>
+    <p class="stage-note">Click any panel to select it, then pick a sample, upload a photo, or tune zoom, pan and the face focal point. Drag directly on a panel to move its focal point while face-aware crop is on. The preview is the exact export — what you see is the PNG.</p>
     <div class="export-row">
       <button class="btn primary" id="exportCurrent">Export this size (PNG)</button>
       <button class="btn" id="exportAll">Export all 3 sizes</button>
@@ -41,6 +58,20 @@
     <section class="group">
       <h2>Layout</h2>
       <div class="chip-grid" id="layoutChips"></div>
+      <p class="face-note">Cast Seven is the default: a pop-out hero in the middle, six face panels around it, every panel tagged with its role.</p>
+    </section>
+
+    <section class="group">
+      <h2>The Cast</h2>
+      <ol class="cast-list">
+        <li><b>THE DRIVER</b> — Ocean Drive · 6:42 PM · looking for trouble</li>
+        <li><b>THE BOSS</b> — Biscayne Bay · 7:15 PM · he owns the harbor</li>
+        <li><b>THE RIDER</b> — Collins Ave · 11:48 PM · never looks back</li>
+        <li><b>THE MECHANIC</b> — Little Havana · 9:03 AM · she builds the getaway</li>
+        <li><b>THE CAPTAIN</b> — Sunset Pier · 5:27 PM · knows every current</li>
+        <li><b>THE LOOKOUT</b> — Downtown Rooftop · 8:19 PM · sees everything coming</li>
+        <li><b>THE WHEELMAN</b> — Ocean Drive · 6:44 PM · foot down, no brakes</li>
+      </ol>
     </section>
 
     <section class="group">
@@ -62,7 +93,7 @@
         <input id="capSubtitle" type="text" maxlength="24" value="Vice Nights">
       </label>
       <label class="field">Tagline (bottom strip)
-        <input id="capTagline" type="text" maxlength="48" value="ONE COAST • NO RULES • COMING SOON">
+        <input id="capTagline" type="text" maxlength="48" value="SEVEN LIVES · ONE HARBOR · NO WAY BACK">
       </label>
       <label class="field">Review quote
         <input id="capQuote" type="text" maxlength="48" value="A FEVER DREAM IN NEON">
@@ -70,7 +101,8 @@
     </section>
 
     <section class="group">
-      <h2>Photos — panel <span id="panelNumber">1</span> of 6</h2>
+      <h2>Photos — panel <span id="panelNumber">1</span> of <span id="panelTotal">7</span></h2>
+      <p class="cast-tag" id="castTag">THE DRIVER — OCEAN DRIVE · 6:42 PM · LOOKING FOR TROUBLE</p>
       <div class="samples" id="sampleRow"></div>
       <label class="upload-box">
         <input id="uploadInput" type="file" accept="image/*" hidden>
@@ -80,10 +112,10 @@
         <label class="field">Zoom <span class="val" id="zoomVal">1.00×</span>
           <input id="zoomSlider" type="range" min="1" max="2.5" step="0.01" value="1">
         </label>
-        <label class="field">Pan left / right <span class="val" id="panXVal">0</span>
+        <label class="field">Pan left / right <span class="val" id="panXVal">0.00</span>
           <input id="panXSlider" type="range" min="-0.5" max="0.5" step="0.01" value="0">
         </label>
-        <label class="field">Pan up / down <span class="val" id="panYVal">0</span>
+        <label class="field">Pan up / down <span class="val" id="panYVal">0.00</span>
           <input id="panYSlider" type="range" min="-0.5" max="0.5" step="0.01" value="0">
         </label>
       </div>
@@ -93,13 +125,29 @@
       </div>
     </section>
 
+    <section class="group">
+      <h2>Face-aware crop</h2>
+      <p class="face-note">Portraits are cropped around the face, never the middle of the frame — no headless panels. Drag on the cover to move the focal point, or nudge it here.</p>
+      <div class="toggles">
+        <label><input id="faceAwareToggle" type="checkbox" checked> Face-aware crop</label>
+      </div>
+      <div class="sliders">
+        <label class="field">Focal point — left / right <span class="val" id="focalXVal">0.50</span>
+          <input id="focalXSlider" type="range" min="0" max="1" step="0.01" value="0.5">
+        </label>
+        <label class="field">Focal point — up / down <span class="val" id="focalYVal">0.22</span>
+          <input id="focalYSlider" type="range" min="0" max="1" step="0.01" value="0.22">
+        </label>
+      </div>
+    </section>
+
     <section class="group help">
       <h2>How it works</h2>
       <ol>
-        <li>Pick a layout — Key Art is the six-panel default.</li>
+        <li>Cast Seven is the default — seven distinct faces, each with a role tag.</li>
         <li>Click a panel, then a photo, or drop your own in.</li>
-        <li>Edit the title, subtitle and tagline.</li>
-        <li>Choose a grade and effects, then export the PNG.</li>
+        <li>Move the focal point so the face stays in frame, then edit the title, subtitle and tagline.</li>
+        <li>Choose a grade and effects, then export the PNG in all three sizes.</li>
       </ol>
       <p class="fine">Everything runs offline in your browser. No photo ever leaves this page.</p>
     </section>

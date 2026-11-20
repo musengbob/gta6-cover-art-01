@@ -1,9 +1,9 @@
-// Canvas renderer: draws the whole cover — panels, grade, gradient
-// title, neon subtitle and poster furniture — onto any canvas at any
-// export size. The live preview and the exported PNG share this one
-// code path, so what the user sees is exactly what ships.
+// Canvas renderer: draws the whole cover — cast panels, grade, striped
+// retro-chrome title, neon subtitle and full poster furniture — onto any
+// canvas at any export size. The live preview and the exported PNG share
+// this one code path, so what the user sees is exactly what ships.
 
-import { LAYOUTS, GRADES, SAMPLES } from './state.js';
+import { LAYOUTS, GRADES, SAMPLES, billingLines } from './state.js';
 
 const GAP = 6; // white gutter between panels, in export pixels at 1080 wide
 
@@ -12,9 +12,13 @@ function sampleSrc(id) {
   return hit ? hit.src : SAMPLES[0].src;
 }
 
-// Cover-fit source rect for one image inside one panel, with the
-// panel's zoom, pan and flip applied.
-function coverRect(img, pw, ph, panel) {
+// Face-aware cover-fit source rect for one image inside one panel, with
+// the panel's zoom, pan and flip applied. When faceAware is on, the crop
+// window centres on the panel's focal point (the face zone of the photo)
+// instead of the middle of the frame, so a portrait never comes out
+// headless or neck-cropped; pan then nudges from that anchor. This is
+// the faceAwareCrop behind the editor's "Face-aware crop" toggle.
+function faceAwareCrop(img, pw, ph, panel) {
   const imgRatio = img.naturalWidth / img.naturalHeight;
   const panelRatio = pw / ph;
   let sw;
@@ -30,18 +34,46 @@ function coverRect(img, pw, ph, panel) {
   sh /= panel.zoom;
   const maxX = img.naturalWidth - sw;
   const maxY = img.naturalHeight - sh;
-  const sx = Math.max(0, Math.min(maxX, maxX * (0.5 + panel.panX)));
-  const sy = Math.max(0, Math.min(maxY, maxY * (0.5 + panel.panY)));
+  let cx;
+  let cy;
+  if (panel.faceAware) {
+    // Anchor the crop window on the focal (face) point, then pan from it.
+    cx = panel.focalX * img.naturalWidth + panel.panX * maxX;
+    cy = panel.focalY * img.naturalHeight + panel.panY * maxY;
+  } else {
+    cx = maxX * (0.5 + panel.panX) + sw / 2;
+    cy = maxY * (0.5 + panel.panY) + sh / 2;
+  }
+  const sx = Math.max(0, Math.min(maxX, cx - sw / 2));
+  const sy = Math.max(0, Math.min(maxY, cy - sh / 2));
   return { sx, sy, sw, sh };
+}
+
+function drawOnePanel(ctx, img, x, y, w, h, panel) {
+  const { sx, sy, sw, sh } = faceAwareCrop(img, w, h, panel);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  if (panel.flip) {
+    ctx.translate(x + w, y);
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+  } else {
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+  }
+  ctx.restore();
 }
 
 function drawPanels(ctx, W, H, state, images) {
   const layout = LAYOUTS[state.layout];
   const gap = (GAP * W) / 1080;
   const grade = GRADES[state.grade];
+  const hero = layout.popoutHero !== undefined ? layout.popoutHero : -1;
   ctx.save();
   ctx.filter = grade.filter;
   layout.rects.forEach((rect, i) => {
+    if (i === hero) return; // the pop-out hero is drawn last, on top
     const panel = state.panels[i];
     const img = images.get(panel.custom ? `custom:${i}` : panel.sample);
     if (!img) return;
@@ -49,20 +81,30 @@ function drawPanels(ctx, W, H, state, images) {
     const y = rect[1] * H + gap / 2;
     const w = rect[2] * W - gap;
     const h = rect[3] * H - gap;
-    const { sx, sy, sw, sh } = coverRect(img, w, h, panel);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(x, y, w, h);
-    ctx.clip();
-    if (panel.flip) {
-      ctx.translate(x + w, y);
-      ctx.scale(-1, 1);
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
-    } else {
-      ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
-    }
-    ctx.restore();
+    drawOnePanel(ctx, img, x, y, w, h, panel);
   });
+  if (hero >= 0) {
+    // Pop-out hero: drawn overflowing its frame with a hard drop shadow
+    // and a white key line, so the Driver bursts out of the grid.
+    const panel = state.panels[hero];
+    const img = images.get(panel.custom ? `custom:${hero}` : panel.sample);
+    if (img) {
+      const rect = layout.rects[hero];
+      const over = gap * 1.6;
+      const x = rect[0] * W - over;
+      const y = rect[1] * H - over;
+      const w = rect[2] * W + over * 2;
+      const h = rect[3] * H + over * 2;
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.65)';
+      ctx.shadowBlur = W * 0.02;
+      ctx.shadowOffsetY = W * 0.008;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(x - gap * 0.45, y - gap * 0.45, w + gap * 0.9, h + gap * 0.9);
+      ctx.restore();
+      drawOnePanel(ctx, img, x, y, w, h, panel);
+    }
+  }
   ctx.restore();
   // Warm/cool wash over the whole panel area.
   ctx.save();
@@ -70,6 +112,50 @@ function drawPanels(ctx, W, H, state, images) {
   ctx.fillStyle = grade.wash;
   ctx.fillRect(0, 0, W, H);
   ctx.restore();
+}
+
+// Shrink the font until the text fits the width; returns the fitted size.
+function fitFont(ctx, text, maxWidth, startSize, family) {
+  let size = startSize;
+  ctx.font = `${Math.round(size)}px ${family}`;
+  while (size > 6 && ctx.measureText(text).width > maxWidth) {
+    size -= 1;
+    ctx.font = `${Math.round(size)}px ${family}`;
+  }
+  return size;
+}
+
+function drawRoleTags(ctx, W, H, state) {
+  const layout = LAYOUTS[state.layout];
+  const gap = (GAP * W) / 1080;
+  layout.rects.forEach((rect, i) => {
+    const panel = state.panels[i];
+    const cast = panel.cast;
+    if (!cast) return;
+    const x = rect[0] * W + gap / 2;
+    const y = rect[1] * H + gap / 2;
+    const w = rect[2] * W - gap;
+    const h = rect[3] * H - gap;
+    const pad = Math.max(5, W * 0.006);
+    const roleSize = fitFont(ctx, cast.role, w - pad * 2, W * 0.018, '"Anton", sans-serif');
+    const subSize = fitFont(ctx, cast.sub, w - pad * 2, W * 0.0115, '"Bebas Neue", sans-serif');
+    const chipH = pad * 2 + roleSize * 1.05 + subSize * 1.15;
+    const chipY = y + h - chipH - Math.max(3, gap * 0.5);
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.74)';
+    ctx.fillRect(x + gap * 0.4, chipY, w - gap * 0.8, chipH);
+    ctx.fillStyle = '#ff2e88';
+    ctx.fillRect(x + gap * 0.4, chipY, Math.max(3, W * 0.004), chipH);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#fff';
+    ctx.font = `${Math.round(roleSize)}px "Anton", sans-serif`;
+    ctx.fillText(cast.role, x + pad + W * 0.006, chipY + pad + roleSize * 0.95);
+    ctx.fillStyle = '#ffd21f';
+    ctx.font = `${Math.round(subSize)}px "Bebas Neue", sans-serif`;
+    ctx.fillText(cast.sub, x + pad + W * 0.006, chipY + pad + roleSize * 1.05 + subSize * 1.05);
+    ctx.restore();
+  });
 }
 
 function drawHalftone(ctx, W, H, bandY, bandH) {
@@ -174,9 +260,210 @@ function drawStarburst(ctx, W, H) {
   ctx.restore();
 }
 
+function drawVolBox(ctx, W, H) {
+  const u = W / 1080;
+  const bw = W * 0.082;
+  const bh = Math.max(22, H * 0.032);
+  const x = W * 0.015;
+  const y = H * 0.015;
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(x, y, bw, bh);
+  ctx.lineWidth = Math.max(2, 2 * u);
+  ctx.strokeStyle = '#fff';
+  ctx.strokeRect(x, y, bw, bh);
+  ctx.fillStyle = '#ffd21f';
+  ctx.font = `${Math.round(Math.min(bh * 0.58, W * 0.016))}px "Bebas Neue", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('VOL. 01', x + bw / 2, y + bh / 2 + 1);
+  ctx.restore();
+}
+
+function drawGoldSeal(ctx, W, H, cx, cy) {
+  const r = W * 0.033;
+  ctx.save();
+  ctx.translate(cx, cy);
+  const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+  g.addColorStop(0, '#ffe98a');
+  g.addColorStop(0.55, '#e9b949');
+  g.addColorStop(1, '#a87c1f');
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = W * 0.01;
+  ctx.shadowOffsetY = W * 0.004;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.lineWidth = Math.max(1.5, W * 0.0018);
+  ctx.strokeStyle = '#7a5c14';
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.78, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = '#4a3405';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${Math.round(r * 0.42)}px "Anton", sans-serif`;
+  ctx.fillText('★', 0, -r * 0.38);
+  ctx.font = `${Math.round(r * 0.3)}px "Bebas Neue", sans-serif`;
+  ctx.fillText('SUNSET BAY', 0, r * 0.08);
+  ctx.fillText('APPROVED', 0, r * 0.42);
+  ctx.restore();
+}
+
+function drawStarsRow(ctx, cx, y, starR, u) {
+  ctx.save();
+  ctx.fillStyle = '#ffd21f';
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 1.5 * u;
+  for (let i = 0; i < 5; i += 1) {
+    const sx = cx + (i - 2) * starR * 2.6;
+    starPath(ctx, sx, y, 5, starR, starR * 0.45);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// The striped retro-chrome title: horizontal pink/yellow/purple stripes
+// inside the letters, extruded with offset shadows, MASSIVE and centred
+// OVER the hero face — not a flat gradient, not bottom-anchored.
+let stripePattern = null;
+function drawChromeTitle(ctx, W, H, state, cx, cy, titleSize) {
+  const u = W / 1080;
+  if (!stripePattern) {
+    const tile = document.createElement('canvas');
+    tile.width = 6;
+    tile.height = 36;
+    const tctx = tile.getContext('2d');
+    tctx.fillStyle = '#ff5da2';
+    tctx.fillRect(0, 0, 6, 12);
+    tctx.fillStyle = '#ffd21f';
+    tctx.fillRect(0, 12, 6, 12);
+    tctx.fillStyle = '#b26bff';
+    tctx.fillRect(0, 24, 6, 12);
+    stripePattern = ctx.createPattern(tile, 'repeat');
+  }
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.035);
+  ctx.font = `${Math.round(titleSize)}px "Anton", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  try {
+    ctx.letterSpacing = `${Math.round(2 * u)}px`;
+  } catch {
+    // Older canvas builds ignore letterSpacing; spacing is cosmetic.
+  }
+  ctx.lineJoin = 'round';
+  // Extruded offset shadows: three solid copies stepping down-right.
+  ctx.fillStyle = '#3d0a4d';
+  ctx.fillText(state.title, 4 * u, 4 * u);
+  ctx.fillStyle = '#7a1e5e';
+  ctx.fillText(state.title, 8 * u, 8 * u);
+  ctx.fillStyle = '#2a0a3d';
+  ctx.fillText(state.title, 12 * u, 12 * u);
+  // Thick black outline, then the stripe fill.
+  ctx.shadowColor = 'rgba(0,0,0,0.75)';
+  ctx.shadowBlur = 14 * u;
+  ctx.shadowOffsetX = 7 * u;
+  ctx.shadowOffsetY = 7 * u;
+  ctx.lineWidth = Math.max(6, W * 0.011);
+  ctx.strokeStyle = '#0d0d0d';
+  ctx.strokeText(state.title, 0, 0);
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = stripePattern;
+  ctx.fillText(state.title, 0, 0);
+  // A thin white top edge so the chrome catches the light.
+  ctx.lineWidth = Math.max(1.5, W * 0.0016);
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.strokeText(state.title, 0, -titleSize * 0.02);
+  ctx.restore();
+}
+
 function drawTitleBlock(ctx, W, H, state) {
   const u = W / 1080; // scale unit: 1 at 1080 wide
   const cx = W / 2;
+  const layout = LAYOUTS[state.layout];
+
+  if (layout.castSeven) {
+    // Cast Seven title block: neon script above, MASSIVE chrome title
+    // centred over the hero face, stars + quote in the free centre strip
+    // below the hero (between the two bottom panels).
+    const titleSize = Math.min(W * 0.15, H * 0.16);
+    // titleY 0.42H (not 0.38H): the top-row role chips end at 0.32H, and
+    // the title's top edge must clear them in every aspect ratio —
+    // at 0.38H the title covered THE BOSS's sub-caption and hid THE
+    // RIDER's tag almost entirely. The title still overlaps the hero.
+    const titleY = H * 0.42;
+    const bandH = titleSize * 2.1;
+
+    // Soft dark band so the title stays readable over any photo.
+    const band = ctx.createLinearGradient(0, titleY - bandH * 0.62, 0, titleY + bandH * 0.42);
+    band.addColorStop(0, 'rgba(0,0,0,0)');
+    band.addColorStop(0.5, 'rgba(0,0,0,0.42)');
+    band.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = band;
+    ctx.fillRect(0, titleY - bandH * 0.62, W, bandH);
+
+    if (state.effects.halftone) {
+      drawHalftone(ctx, W, H, titleY - bandH * 0.62, bandH);
+    }
+
+    // Neon pink script subtitle, floating just above the title.
+    ctx.save();
+    ctx.translate(cx, titleY - titleSize * 0.95);
+    ctx.rotate(-0.035);
+    ctx.font = `${Math.round(W * 0.052)}px "Pacifico", cursive`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = '#ff2e88';
+    ctx.shadowBlur = 22 * u;
+    ctx.lineWidth = 6 * u;
+    ctx.strokeStyle = 'rgba(40,0,30,0.9)';
+    ctx.strokeText(state.subtitle, 0, 0);
+    ctx.fillStyle = '#ff7ac0';
+    ctx.fillText(state.subtitle, 0, 0);
+    ctx.restore();
+
+    drawChromeTitle(ctx, W, H, state, cx, titleY, titleSize);
+
+    // Stars + review quote in the centre strip below the hero.
+    const starR = Math.min(W, H) * 0.016;
+    drawStarsRow(ctx, cx, H * 0.685, starR, u);
+    ctx.save();
+    ctx.font = `${Math.round(Math.min(W, H) * 0.024)}px "Bebas Neue", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4 * u;
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    const quote = `“${state.quote}” — THE COAST HERALD`;
+    ctx.strokeText(quote, cx, H * 0.72);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(quote, cx, H * 0.72);
+    ctx.restore();
+
+    // Gold seal + COMING SOON, centred in the same free strip.
+    drawGoldSeal(ctx, W, H, cx, H * 0.8);
+    ctx.save();
+    ctx.font = `${Math.round(W * 0.024)}px "Bebas Neue", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    try {
+      ctx.letterSpacing = `${Math.round(4 * u)}px`;
+    } catch {
+      // Cosmetic only.
+    }
+    ctx.lineWidth = 4 * u;
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.strokeText('COMING SOON', cx, H * 0.872);
+    ctx.fillStyle = '#ffd21f';
+    ctx.fillText('COMING SOON', cx, H * 0.872);
+    ctx.restore();
+    return;
+  }
+
   // The title block is anchored to the strip, not to the top: the title
   // size is capped by the cover height, and the stars and quote sit a
   // fixed step above the strip. That keeps the whole block on-canvas
@@ -216,49 +503,13 @@ function drawTitleBlock(ctx, W, H, state) {
   ctx.fillText(state.subtitle, 0, 0);
   ctx.restore();
 
-  // The title: gradient fill, thick black outline, slight slant.
-  ctx.save();
-  ctx.translate(cx, titleY);
-  ctx.rotate(-0.035);
-  ctx.font = `${Math.round(titleSize)}px "Anton", sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  try {
-    ctx.letterSpacing = `${Math.round(2 * u)}px`;
-  } catch {
-    // Older canvas builds ignore letterSpacing; spacing is cosmetic.
-  }
-  const grad = ctx.createLinearGradient(-W * 0.45, 0, W * 0.45, 0);
-  grad.addColorStop(0, '#FFE259');
-  grad.addColorStop(0.5, '#FF7A18');
-  grad.addColorStop(1, '#FF2E88');
-  ctx.shadowColor = 'rgba(0,0,0,0.75)';
-  ctx.shadowBlur = 14 * u;
-  ctx.shadowOffsetX = 7 * u;
-  ctx.shadowOffsetY = 7 * u;
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = Math.max(6, W * 0.011);
-  ctx.strokeStyle = '#0d0d0d';
-  ctx.strokeText(state.title, 0, 0);
-  ctx.shadowColor = 'transparent';
-  ctx.fillStyle = grad;
-  ctx.fillText(state.title, 0, 0);
-  ctx.restore();
+  // The title: striped retro-chrome, thick black outline, slight slant.
+  drawChromeTitle(ctx, W, H, state, cx, titleY, titleSize);
 
   // Five gold stars and the review quote, under the title. Both scale
   // with the shorter side so the stars never crowd the quote on wide.
   const starR = Math.min(W, H) * 0.016;
-  ctx.save();
-  ctx.fillStyle = '#ffd21f';
-  ctx.strokeStyle = '#111';
-  ctx.lineWidth = 1.5 * u;
-  for (let i = 0; i < 5; i += 1) {
-    const sx = cx + (i - 2) * starR * 2.6;
-    starPath(ctx, sx, starY, 5, starR, starR * 0.45);
-    ctx.fill();
-    ctx.stroke();
-  }
-  ctx.restore();
+  drawStarsRow(ctx, cx, starY, starR, u);
 
   ctx.save();
   ctx.font = `${Math.round(Math.min(W, H) * 0.024)}px "Bebas Neue", sans-serif`;
@@ -319,6 +570,7 @@ function drawBarcode(ctx, x, y, w, h) {
 }
 
 function drawBottomStrip(ctx, W, H, state) {
+  const layout = LAYOUTS[state.layout];
   const stripH = H * 0.062;
   const y0 = H - stripH;
   const grad = ctx.createLinearGradient(0, y0, 0, H);
@@ -342,10 +594,31 @@ function drawBottomStrip(ctx, W, H, state) {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#fff';
   ctx.fillText(state.tagline, W * 0.5, y0 + stripH * 0.34);
-  ctx.font = `${Math.round(stripH * 0.19)}px "Bebas Neue", sans-serif`;
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.fillText('CORAL COAST © 2026 SUNSET BAY STUDIOS • A FAN-MADE COVER MAKER • NOT AFFILIATED WITH ROCKSTAR GAMES', W * 0.5, y0 + stripH * 0.76);
   ctx.restore();
+
+  if (layout.castSeven) {
+    // Full billing block, computed from the cast, on two small lines.
+    const lines = billingLines();
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.62)';
+    const size1 = fitFont(ctx, lines[0], W * 0.82, stripH * 0.19, '"Bebas Neue", sans-serif');
+    ctx.fillText(lines[0], W * 0.5, y0 + stripH * 0.62);
+    const size2 = fitFont(ctx, lines[1], W * 0.82, stripH * 0.19, '"Bebas Neue", sans-serif');
+    void size2;
+    ctx.fillText(lines[1], W * 0.5, y0 + stripH * 0.86);
+    void size1;
+    ctx.restore();
+  } else {
+    ctx.save();
+    ctx.font = `${Math.round(stripH * 0.19)}px "Bebas Neue", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillText('CORAL COAST © 2026 SUNSET BAY STUDIOS • A FAN-MADE COVER MAKER • NOT AFFILIATED WITH ROCKSTAR GAMES', W * 0.5, y0 + stripH * 0.76);
+    ctx.restore();
+  }
 
   // Barcode on the right.
   drawBarcode(ctx, W * 0.885, y0 + stripH * 0.12, W * 0.085, stripH * 0.76);
@@ -365,11 +638,14 @@ function drawSelection(ctx, W, H, state) {
 
 // The single render path: preview and export both call this.
 export function renderCover(ctx, W, H, state, images, { selection = false } = {}) {
+  const layout = LAYOUTS[state.layout];
   ctx.save();
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, W, H);
   drawPanels(ctx, W, H, state, images);
+  drawRoleTags(ctx, W, H, state);
   if (state.effects.flare) drawFlare(ctx, W, H);
+  if (layout.castSeven) drawVolBox(ctx, W, H);
   drawStarburst(ctx, W, H);
   drawTitleBlock(ctx, W, H, state);
   drawBottomStrip(ctx, W, H, state);
