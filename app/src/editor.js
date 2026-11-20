@@ -105,6 +105,9 @@ async function assignFile(file, panelIndex) {
   images.set(`custom:${panelIndex}`, img);
   const panel = state.panels[panelIndex];
   panel.custom = dataUrl;
+  // A user-uploaded photo is not one of the cast: drop the role tag so
+  // the cover never claims a stranger is THE DRIVER (or any other role).
+  panel.cast = null;
   panel.zoom = 1;
   panel.panX = 0;
   panel.panY = 0;

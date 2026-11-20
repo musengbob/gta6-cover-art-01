@@ -304,3 +304,13 @@ body {
 .help ol { margin: 0 0 8px; padding-left: 20px; font-size: 16px; color: var(--ink-dim); }
 .help li { margin-bottom: 4px; }
 .fine { font-size: 14px; color: var(--ink-dim); margin: 0; }
+
+/* Keyboard users get a visible focus ring on every clickable control. */
+.btn:focus-visible,
+.chip:focus-visible,
+.size-tab:focus-visible,
+.sample:focus-visible,
+.upload-box:focus-visible {
+  outline: 2px solid var(--accent-3);
+  outline-offset: 2px;
+}

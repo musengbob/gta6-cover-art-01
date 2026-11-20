@@ -32,10 +32,14 @@ export const CAST = [
   { role: 'THE WHEELMAN', sub: 'OCEAN DRIVE · 6:44 PM · FOOT DOWN, NO BRAKES' },
 ];
 
+// The billing block is computed from CAST, not duplicated as literals,
+// so renaming a role or reordering the cast can never leave the poster
+// naming someone who is not on it. Output is identical to the r4 text.
 export function billingLines() {
+  const roles = CAST.map((c) => c.role);
   return [
-    'A CORAL COAST PICTURE  •  STARRING THE DRIVER  •  THE BOSS  •  THE RIDER  •  THE MECHANIC',
-    'THE CAPTAIN  •  THE LOOKOUT  •  THE WHEELMAN  •  SHOT ON YOUR OWN CAMERA  •  GRADED BY HAND',
+    `A CORAL COAST PICTURE  •  STARRING ${roles.slice(0, 4).join('  •  ')}`,
+    `${roles.slice(4).join('  •  ')}  •  SHOT ON YOUR OWN CAMERA  •  GRADED BY HAND`,
   ];
 }
 
